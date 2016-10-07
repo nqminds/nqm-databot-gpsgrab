@@ -26,4 +26,5 @@ function databot(input, output, context) {
 var input = require("nqm-databot-utils").input;
 
 // Read any data passed from the process host. Specify we're expecting JSON data.
+//test
 input.pipe(databot);
