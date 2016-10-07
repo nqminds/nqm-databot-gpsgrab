@@ -27,5 +27,3 @@ var input = require("nqm-databot-utils").input;
 
 // Read any data passed from the process host. Specify we're expecting JSON data.
 input.pipe(databot);
-
-console.log("Test");
