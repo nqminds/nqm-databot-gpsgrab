@@ -6,33 +6,35 @@ module.exports = (configpath) => {
     var fs = require("fs");
     var assert = require("assert");
     var _ = require("lodash");
+    var TDXAPI = require("nqm-api-tdx");
+    var Promise = require("bluebird");
 
     var config = require(configpath);
 
     var outputType = {
-        DEBUG: 1,     // STDOUT - diagnostic fed back to TDX
-        ERROR: 2,     // STDERR - fed back to TDX
-        RESULT: 3,    // Result update to the TDX
-        PROGRESS: 4,  // Progress updates to TDX
+        DEBUG: 1, // STDOUT - diagnostic fed back to TDX
+        ERROR: 2, // STDERR - fed back to TDX
+        RESULT: 3, // Result update to the TDX
+        PROGRESS: 4, // Progress updates to TDX
     };
 
-    var _writeOutput = function(fd, msg) {
+    var _writeOutput = function (fd, msg) {
         msg = typeof msg !== "undefined" ? msg : "";
         var buf = new Buffer(msg.toString());
         fs.writeSync(fd, buf, 0, buf.length);
     };
 
-    var writeDebug = function() {
+    var writeDebug = function () {
         var msg = util.format.apply(util, arguments);
         return debugLog(msg);
     };
 
-    var writeError = function() {
+    var writeError = function () {
         var msg = util.format.apply(util, arguments);
         return _writeOutput(outputType.ERROR, msg + "\n");
     };
 
-    var writeResult = function(obj) {
+    var writeResult = function (obj) {
         if (typeof obj !== "object") {
             return writeError("output.result - expected type 'object', got type '%s'", typeof obj);
         } else {
@@ -40,7 +42,7 @@ module.exports = (configpath) => {
         }
     };
 
-    var writeProgress = function(progress) {
+    var writeProgress = function (progress) {
         assert(_.isNumber(progress));
         return _writeOutput(outputType.PROGRESS, progress.toString() + "\n");
     };
@@ -53,13 +55,41 @@ module.exports = (configpath) => {
         error: writeError,
         result: writeResult
     };
-    
-    var readAndRun = function(cb) {
+
+    var readAndRun = function (cb) {
         if (typeof cb !== "function") {
             throw new Error("input.read - callback required");
         }
+        var context = {
+            "instanceId":config.instanceId,
+            "instanceName":config.instanceName,
+            "instancePort":config.instancePort,
+            "instanceAuthKey":config.instanceAuthKey,
+            "authToken":config.authToken,
+            "outputSchema":config.outputSchema,
+            "chunkNumber":config.chunkNumber,
+            "chunkTotal":config.chunkTotal,
+            "packageParams":config.packageParams,
+            "commandHost":config.commandHost,
+            "queryHost":config.queryHost,
+            "tdxApi":null
+        };
 
-        cb(config.inputSchema, output, context);
+        // Initialise a tdx api instance
+        context.tdxApi = new TDXAPI({
+            commandHost: context.commandHost,
+            queryHost: context.queryHost,
+            accessToken: context.authToken
+        });
+        Promise.promisifyAll(context.tdxApi);
+
+        context.tdxApi.authenticate(config.tokenID, config.tokenSecret, function(err, accessToken){
+            if(err) throw err;
+            else {
+                context.authToken = accessToken;
+                cb(config.inputSchema, output, context);
+            }
+        });
     }
 
     return {
