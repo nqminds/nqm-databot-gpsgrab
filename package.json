@@ -21,7 +21,9 @@
     "debug": "^2.2.0",
     "lodash": "^4.16.4",
     "nqm-api-tdx": "^0.1.8",
-    "nqm-databot-utils": "^0.1.4"
+    "nqm-databot-utils": "^0.1.4",
+    "superagent": "^2.3.0",
+    "xml2js": "^0.4.17"
   },
   "devDependencies": {}
 }

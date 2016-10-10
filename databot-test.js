@@ -44,7 +44,7 @@ module.exports = (configpath) => {
 
     var writeProgress = function (progress) {
         assert(_.isNumber(progress));
-        return _writeOutput(outputType.PROGRESS, progress.toString() + "\n");
+        return _writeOutput(outputType.DEBUG, "Progress:"+progress.toString() + "\n");
     };
 
 
