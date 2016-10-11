@@ -73,7 +73,7 @@ module.exports = (configpath) => {
             "commandHost":config.commandHost,
             "queryHost":config.queryHost,
             "tdxApi":null,
-            "shareKeyID":config.shareKeyID,
+            "shareKeyId":config.shareKeyId,
             "shareKeySecret":config.shareKeySecret
         };
 
@@ -85,7 +85,7 @@ module.exports = (configpath) => {
         });
         Promise.promisifyAll(context.tdxApi);
 
-        context.tdxApi.authenticate(config.shareKeyID, config.shareKeySecret, function(err, accessToken){
+        context.tdxApi.authenticate(config.shareKeyId, config.shareKeySecret, function(err, accessToken){
             if(err) throw err;
             else {
                 context.authToken = accessToken;

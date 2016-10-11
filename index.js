@@ -95,9 +95,9 @@ function databot(input, output, context) {
         queryHost: context.queryHost
     });
 
-    console.log("Auth:"+context.shareKeyID+":"+context.shareKeySecret);
-    
-    tdxApi.authenticate(context.shareKeyID, context.shareKeySecret, function (err, accessToken) {
+    console.log("Auth:"+context.shareKeyId+":"+context.shareKeySecret);
+
+    tdxApi.authenticate(context.shareKeyId, context.shareKeySecret, function (err, accessToken) {
         if (err) {
             output.error("%s", JSON.stringify(err));
             process.exit(1);
