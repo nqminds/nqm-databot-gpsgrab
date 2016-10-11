@@ -10,22 +10,68 @@ function databot(input, output, context) {
         } else {
             output.debug("Retrieved GPS sources table: %d entries", sourcesData.data.length);
 
-            _.forEach(sourcesData.data, function (element) {
+
+            var req = function (gpslist, reqlist, cb) {
+
+                var element;
+
+                if (!reqlist.length) {
+                    cb(gpslist);
+                    return;
+                }
+
+                element = reqlist.pop();
+
                 if (element.Src == 'MK' && element.Datatype == 'XML') {
                     request
                         .get(element.Host + element.Path)
                         .auth(element.APIKey, '')
-                        .end(function (error, res) {
-                            parseXmlString(res.text, function (errXmlParse, result) {
-                                if (errXmlParse) {
-                                    output.error("XML parse error: %s", JSON.stringify(errXmlParse));
-                                    console.log(result);
-                                } else
-                                    output.debug(JSON.stringify(result));
-                            });
+                        .end((error, response) => {
+                            if (error) {
+                                output.error("API request error: %s", error);
+                                req(gpslist, reqlist, cb);
+                            } else
+                                parseXmlString(response.text, function (errXmlParse, result) {
+                                    if (errXmlParse) {
+                                        output.error("XML parse error: %s", JSON.stringify(errXmlParse));
+                                        req(gpslist, reqlist, cb);
+                                    } else {
+                                        var timestamp, lat, lon, ele;
+
+                                        _.forEach(result.feed.datastream, function (field) {
+                                            if (field['$']['id'] == "1") {
+                                                var date = new Date(Date.parse(field['current_time']));
+                                                timestamp = date.getTime();
+                                            } else if (field['$']['id'] == "2")
+                                                lat = field['current_value'];
+                                            else if (field['$']['id'] == "3")
+                                                lon = field['current_value'];
+                                        });
+
+                                        var entry = {
+                                            'ID': Number(element.ID),
+                                            'timestamp': Number(timestamp),
+                                            'lat': Number(lat),
+                                            'lon': Number(lon),
+                                            'ele': Number(result.feed['location'][0]['ele'])
+                                        };
+                                        context.tdxApi.addDatasetData(context.packageParams.gpsDataTable, entry, function (errAdd, resAdd) {
+                                            if (errAdd) output.error("Error adding entry to dataset: %s", JSON.stringify(errAdd));
+                                            else gpslist.push(entry);
+                                            req(gpslist, reqlist, cb);
+                                        });
+                                    }
+                                });
                         });
+                } else {
+                    cb(gpslist);
+                    return;
                 }
-            }, this);
+            }
+
+            setInterval(function(){
+                req([], sourcesData.data.slice(), function (gpslist) {});
+            }, context.packageParams.timerFrequency);
         }
     });
 }
@@ -34,7 +80,6 @@ var input;
 var _ = require('lodash');
 var request = require("superagent");
 var parseXmlString = require('xml2js').parseString;
-var Promise = require("bluebird");
 
 if (process.env.NODE_ENV == 'test') {
     // Requires nqm-databot-gpsgrab.json file for testing
