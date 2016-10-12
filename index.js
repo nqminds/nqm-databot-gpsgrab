@@ -90,10 +90,11 @@ function databot(input, output, context) {
     "use strict"
     output.progress(0);
 
+    // Set access token to 1 year (365 days)
     var tdxApi = new TDXAPI({
         commandHost: context.commandHost,
         queryHost: context.queryHost,
-        accessTokenTTL: 0
+        accessTokenTTL: 31536000
     });
 
     tdxApi.authenticate(context.shareKeyId, context.shareKeySecret, function (err, accessToken) {
