@@ -92,7 +92,8 @@ function databot(input, output, context) {
 
     var tdxApi = new TDXAPI({
         commandHost: context.commandHost,
-        queryHost: context.queryHost
+        queryHost: context.queryHost,
+        accessTokenTTL: 0
     });
 
     tdxApi.authenticate(context.shareKeyId, context.shareKeySecret, function (err, accessToken) {
