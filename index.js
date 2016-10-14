@@ -3,8 +3,9 @@
  * @param {Object} tdx Api object.
  * @param {Object} output functions.
  * @param {Object} packageParams of the databot.
+ * @param {Collection} ID collection.
  */
-function GrapGPS(tdxApi, output, packageParams) {
+function GrapGPS(tdxApi, output, packageParams, colID) {
     tdxApi.getDatasetData(packageParams.gpsSources, null, null, null, function (errSources, sourcesData) {
         if (errSources) {
             output.error("Error GPS sources table: %s", JSON.stringify(errSources));
@@ -57,6 +58,9 @@ function GrapGPS(tdxApi, output, packageParams) {
                                             'lon': Number(lon),
                                             'ele': Number(result.feed['location'][0]['ele'])
                                         };
+
+                                        colID[entry.ID] = entry;
+
                                         tdxApi.addDatasetData(packageParams.gpsDataTable, entry, function (errAdd, resAdd) {
                                             if (errAdd) output.error("Error adding entry to dataset: %s", JSON.stringify(errAdd));
                                             else gpslist.push(entry);
@@ -73,7 +77,37 @@ function GrapGPS(tdxApi, output, packageParams) {
 
             setInterval(function () {
                 req([], sourcesData.data.slice(), function (gpslist) {
-                    output.debug("Added %d entries", gpslist.length);
+                    output.debug("Added %d entries to main dataset", gpslist.length);
+                    var idList = [];
+
+                    _.map(colID, function(val, key){
+                        if (key!=='undefined') {
+                            var entry = {
+                                'ID': Number(val.ID),
+                                'timestamp': Number(val.timestamp),
+                                'lat': Number(val.lat),
+                                'lon': Number(val.lon),
+                                'ele': Number(val.ele)
+                            };
+                            idList.push(entry);
+                        }
+                    });
+
+                    console.log("HERE");
+                    tdxApi.truncateDataset(packageParams.gpsDataTableLatest, function (errTruncate, resTruncate) {
+                        if(errTruncate) {
+                            output.error("Truncate: %s", JSON.stringify(errTruncate));
+                        } else {
+                            tdxApi.addDatasetData(packageParams.gpsDataTableLatest, idList, function (errAdd, resAdd) {
+                                if (errAdd) {
+                                    output.error("Add: %s", JSON.stringify(errAdd));
+                                } else {
+                                    output.debug("Added %d entries to latest dataset", idList.length);
+                                }
+                            });
+                        }
+                    });
+                    
                 });
             }, packageParams.timerFrequency);
         }
@@ -101,7 +135,20 @@ function databot(input, output, context) {
             output.error("%s", JSON.stringify(err));
             process.exit(1);
         } else {
-            GrapGPS(tdxApi, output, context.packageParams);
+            tdxApi.getDatasetData(context.packageParams.gpsDataTableLatest, null, null, null, function (errLatest, sourcesDataLatest) {
+                if(errLatest) {
+                    output.error("%s", JSON.stringify(errLatest));
+                    process.exit(1);
+                } else {
+                    var col = {};
+
+                    _.map(sourcesDataLatest, function(el){
+                        col[el.id] = el;
+                    });
+
+                    GrapGPS(tdxApi, output, context.packageParams, col);
+                }
+            });
         }
     });
 }
