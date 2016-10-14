@@ -25,6 +25,8 @@ function GrapGPS(tdxApi, output, packageParams, colID) {
 
                 element = reqlist.pop();
 
+                output.debug("Processing source ID:%d", element.ID);
+                
                 if (element.Src == 'MK' && element.Datatype == 'XML') {
                     request
                         .get(element.Host + element.Path)
@@ -75,25 +77,24 @@ function GrapGPS(tdxApi, output, packageParams, colID) {
                 }
             }
 
-            setInterval(function () {
+            var runreq = function() {
                 req([], sourcesData.data.slice(), function (gpslist) {
                     output.debug("Added %d entries to main dataset", gpslist.length);
                     var idList = [];
-
+                    
                     _.map(colID, function(val, key){
                         if (key!=='undefined') {
-                            var entry = {
+                            var el = {
                                 'ID': Number(val.ID),
                                 'timestamp': Number(val.timestamp),
                                 'lat': Number(val.lat),
                                 'lon': Number(val.lon),
                                 'ele': Number(val.ele)
                             };
-                            idList.push(entry);
+                            idList.push(el);
                         }
                     });
 
-                    console.log("HERE");
                     tdxApi.truncateDataset(packageParams.gpsDataTableLatest, function (errTruncate, resTruncate) {
                         if(errTruncate) {
                             output.error("Truncate: %s", JSON.stringify(errTruncate));
@@ -109,6 +110,10 @@ function GrapGPS(tdxApi, output, packageParams, colID) {
                     });
                     
                 });
+            }
+
+            var timer = setInterval(function () {
+                runreq();
             }, packageParams.timerFrequency);
         }
     });
