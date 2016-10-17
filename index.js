@@ -3,9 +3,10 @@
  * @param {Object} tdx Api object.
  * @param {Object} output functions.
  * @param {Object} packageParams of the databot.
- * @param {Collection} ID collection.
  */
-function GrapGPS(tdxApi, output, packageParams, colID) {
+function GrapGPS(tdxApi, output, packageParams) {
+    var updateIDState = {};
+
     tdxApi.getDatasetData(packageParams.gpsSources, null, null, null, function (errSources, sourcesData) {
         if (errSources) {
             output.error("Error GPS sources table: %s", JSON.stringify(errSources));
@@ -24,6 +25,9 @@ function GrapGPS(tdxApi, output, packageParams, colID) {
                 }
 
                 element = reqlist.pop();
+                
+                if(updateIDState[element.ID]=='undefined')
+                    updateIDState[element.ID] = true;
 
                 output.debug("Processing source ID:%d", element.ID);
                 
@@ -52,7 +56,8 @@ function GrapGPS(tdxApi, output, packageParams, colID) {
                                             else if (field['$']['id'] == "3")
                                                 lon = field['current_value'];
                                         });
-
+                                        
+                                        
                                         var entry = {
                                             'ID': Number(element.ID),
                                             'timestamp': Number(timestamp),
@@ -61,12 +66,26 @@ function GrapGPS(tdxApi, output, packageParams, colID) {
                                             'ele': Number(result.feed['location'][0]['ele'])
                                         };
 
-                                        colID[entry.ID] = entry;
-
                                         tdxApi.addDatasetData(packageParams.gpsDataTable, entry, function (errAdd, resAdd) {
-                                            if (errAdd) output.error("Error adding entry to dataset: %s", JSON.stringify(errAdd));
-                                            else gpslist.push(entry);
-                                            req(gpslist, reqlist, cb);
+                                            if (errAdd) {
+                                                output.error("Error adding entry to dataset: %s", JSON.stringify(errAdd));
+                                                req(gpslist, reqlist, cb);
+                                            } else {
+                                                gpslist.push(entry);
+
+                                                tdxApi.updateDatasetData(packageParams.gpsDataTableLatest, entry, updateIDState[element.ID], function (errUpdate, resUpdate) {
+                                                    if (errUpdate) {
+                                                        output.error("Update: %s", JSON.stringify(errUpdate));
+                                                        updateIDState[element.ID] = !updateIDState[element.ID];                                                        
+                                                    } else {
+                                                        output.debug("Update: %s", JSON.stringify(entry));
+
+                                                        if (updateIDState[element.ID]) updateIDState[element.ID] = false;
+                                                    }
+
+                                                    req(gpslist, reqlist, cb);
+                                                });
+                                            }
                                         });
                                     }
                                 });
@@ -80,35 +99,6 @@ function GrapGPS(tdxApi, output, packageParams, colID) {
             var runreq = function() {
                 req([], sourcesData.data.slice(), function (gpslist) {
                     output.debug("Added %d entries to main dataset", gpslist.length);
-                    var idList = [];
-                    
-                    _.map(colID, function(val, key){
-                        if (key!=='undefined') {
-                            var el = {
-                                'ID': Number(val.ID),
-                                'timestamp': Number(val.timestamp),
-                                'lat': Number(val.lat),
-                                'lon': Number(val.lon),
-                                'ele': Number(val.ele)
-                            };
-                            idList.push(el);
-                        }
-                    });
-
-                    tdxApi.truncateDataset(packageParams.gpsDataTableLatest, function (errTruncate, resTruncate) {
-                        if(errTruncate) {
-                            output.error("Truncate: %s", JSON.stringify(errTruncate));
-                        } else {
-                            tdxApi.addDatasetData(packageParams.gpsDataTableLatest, idList, function (errAdd, resAdd) {
-                                if (errAdd) {
-                                    output.error("Add: %s", JSON.stringify(errAdd));
-                                } else {
-                                    output.debug("Added %d entries to latest dataset", idList.length);
-                                }
-                            });
-                        }
-                    });
-                    
                 });
             }
 
@@ -140,20 +130,7 @@ function databot(input, output, context) {
             output.error("%s", JSON.stringify(err));
             process.exit(1);
         } else {
-            tdxApi.getDatasetData(context.packageParams.gpsDataTableLatest, null, null, null, function (errLatest, sourcesDataLatest) {
-                if(errLatest) {
-                    output.error("%s", JSON.stringify(errLatest));
-                    process.exit(1);
-                } else {
-                    var col = {};
-
-                    _.map(sourcesDataLatest, function(el){
-                        col[el.id] = el;
-                    });
-
-                    GrapGPS(tdxApi, output, context.packageParams, col);
-                }
-            });
+            GrapGPS(tdxApi, output, context.packageParams);
         }
     });
 }
